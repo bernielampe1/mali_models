@@ -29,6 +29,7 @@ These are targets for Ubuntu 22.04.4 LTS.
 
 # Booting up:
 ```console
+$ gunzip disks/linux-4.19.135_arm64_mods.img.gz
 $ ./run.sh
 [    0.000000] Booting Linux on physical CPU 0x0000000000 [0x411fd070]
 [    0.000000] Linux version 4.19.135 (user@host) (gcc version 11.4.0 (Ubuntu 11.4.0-1ubuntu1~22.04)) #1 SMP PREEMPT Thu Jul 11 16:12:20 EDT 2024

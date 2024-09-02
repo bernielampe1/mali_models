@@ -53,4 +53,3 @@ qemu-system-aarch64 \
     -append 'console=ttyAMA0 root=/dev/ram nokaslr debug earlyprintk' \
     -initrd initramfs-arm64.cpio.gz \
     -dtb qemu_mod.dtb
-

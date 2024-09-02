@@ -10,10 +10,7 @@ initramfs was built using Ubuntu 22.04 and gcc-11 (arm64) following the commands
 # make -C busybox-1.32.0 install
 # mv busybox-1.32.0/_install initramfs
 # for d in "sys" "proc" "cgroup" "etc" "dev" "mnt"; do mkdir -p initramfs/$d; done
-# cp scripts/load_mod.sh initramfs/
-# cp scripts/getfile.sh initramfs/
 # cp scripts/init initramfs/
-# chmod 775 initramfs/init initramfs/load_mod.sh initramfs/getfile.sh
+# chmod 775 initramfs/init
 # chown -R root:root ./initramfs
 # cd initramfs && find . -print0 | cpio --null -ov --format=newc | gzip -9 > ../initramfs.cpio.gz
-

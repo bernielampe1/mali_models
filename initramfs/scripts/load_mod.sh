@@ -31,5 +31,4 @@ BSS=`cat /sys/module/mali_kbase/sections/.bss`
 DATA=`cat /sys/module/mali_kbase/sections/.data`
 
 echo "# Add the following lines to the .gdbinit or copy into kernel gdb session"
-echo "add-symbol-file \${PWD}/${fname} $TEXT -s .bss $BSS -s .data $DATA"
-echo "directory \${KERNEL_SRC}"
+echo "add-symbol-file ${fname} $TEXT -s .bss $BSS -s .data $DATA"

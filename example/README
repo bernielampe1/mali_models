@@ -1,4 +1,4 @@
-# NOTE: command completed on Ubuntu 22.04.4 LTS x86_64 with qemu-system installed
+# NOTE: commands completed on Ubuntu 22.04.4 LTS x86_64 with qemu-system installed.
 
 # retrieve the linux kernel source and driver source for version 29
 $ wget https://cdn.kernel.org/pub/linux/kernel/v4.x/linux-4.19.320.tar.xz >/dev/null 2>&1

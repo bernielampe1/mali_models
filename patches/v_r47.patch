@@ -1,0 +1,387 @@
+diff --git a/driver/product/kernel/drivers/gpu/arm/midgard/Kbuild b/driver/product/kernel/drivers/gpu/arm/midgard/Kbuild
+index 598b021..fdedd97 100644
+--- a/driver/product/kernel/drivers/gpu/arm/midgard/Kbuild
++++ b/driver/product/kernel/drivers/gpu/arm/midgard/Kbuild
+@@ -135,7 +135,8 @@ ccflags-y += \
+     -I$(src) \
+     -I$(src)/platform/$(MALI_PLATFORM_DIR) \
+     -I$(src)/../../../base \
+-    -I$(src)/../../../../include
++    -I$(src)/../../../../include/ \
++    -I$(src)/../../../../include/uapi
+ 
+ subdir-ccflags-y += $(ccflags-y)
+ 
+diff --git a/driver/product/kernel/drivers/gpu/arm/midgard/Makefile b/driver/product/kernel/drivers/gpu/arm/midgard/Makefile
+index 07c3019..402cde2 100644
+--- a/driver/product/kernel/drivers/gpu/arm/midgard/Makefile
++++ b/driver/product/kernel/drivers/gpu/arm/midgard/Makefile
+@@ -16,7 +16,6 @@
+ # along with this program; if not, you can access it online at
+ # http://www.gnu.org/licenses/gpl-2.0.html.
+ #
+-#
+ 
+ KERNEL_SRC ?= /lib/modules/$(shell uname -r)/build
+ KDIR ?= $(KERNEL_SRC)
+@@ -26,176 +25,49 @@ ifeq ($(KDIR),)
+     $(error Must specify KDIR to point to the kernel to target))
+ endif
+ 
+-#
+-# Default configuration values
+-#
+-# Dependency resolution is done through statements as Kconfig
+-# is not supported for out-of-tree builds.
+-#
+-CONFIGS :=
+-ifeq ($(MALI_KCONFIG_EXT_PREFIX),)
+-    CONFIG_MALI_MIDGARD ?= m
+-    ifeq ($(CONFIG_MALI_MIDGARD),m)
+-        CONFIG_MALI_PLATFORM_NAME ?= "devicetree"
+-        CONFIG_MALI_TRACE_POWER_GPU_WORK_PERIOD ?= y
+-        CONFIG_MALI_GATOR_SUPPORT ?= y
+-        CONFIG_MALI_ARBITRATION ?= n
+-        CONFIG_MALI_PARTITION_MANAGER ?= n
+-        CONFIG_MALI_64BIT_HW_ACCESS ?= n
+-
+-        ifneq ($(CONFIG_MALI_NO_MALI),y)
+-            # Prevent misuse when CONFIG_MALI_NO_MALI=y
+-            CONFIG_MALI_REAL_HW ?= y
+-            CONFIG_MALI_CORESIGHT = n
+-        endif
+-
+-        ifeq ($(CONFIG_MALI_MIDGARD_DVFS),y)
+-            # Prevent misuse when CONFIG_MALI_MIDGARD_DVFS=y
+-            CONFIG_MALI_DEVFREQ ?= n
+-        else
+-            CONFIG_MALI_DEVFREQ ?= y
+-        endif
+-
+-        ifeq ($(CONFIG_MALI_DMA_BUF_MAP_ON_DEMAND), y)
+-            # Prevent misuse when CONFIG_MALI_DMA_BUF_MAP_ON_DEMAND=y
+-            CONFIG_MALI_DMA_BUF_LEGACY_COMPAT = n
+-        endif
+-
+-        ifeq ($(CONFIG_MALI_CSF_SUPPORT), y)
+-            CONFIG_MALI_CORESIGHT ?= n
+-        endif
+-
+-        #
+-        # Expert/Debug/Test released configurations
+-        #
+-        ifeq ($(CONFIG_MALI_EXPERT), y)
+-            ifeq ($(CONFIG_MALI_NO_MALI), y)
+-                CONFIG_MALI_REAL_HW = n
+-                CONFIG_MALI_NO_MALI_DEFAULT_GPU ?= "tMIx"
+-
+-            else
+-                # Prevent misuse when CONFIG_MALI_NO_MALI=n
+-                CONFIG_MALI_REAL_HW = y
+-                CONFIG_MALI_ERROR_INJECT = n
+-            endif
+-
+-
+-            ifeq ($(CONFIG_MALI_HW_ERRATA_1485982_NOT_AFFECTED), y)
+-                # Prevent misuse when CONFIG_MALI_HW_ERRATA_1485982_NOT_AFFECTED=y
+-                CONFIG_MALI_HW_ERRATA_1485982_USE_CLOCK_ALTERNATIVE = n
+-            endif
+-
+-            ifeq ($(CONFIG_MALI_DEBUG), y)
+-                CONFIG_MALI_MIDGARD_ENABLE_TRACE ?= y
+-                CONFIG_MALI_SYSTEM_TRACE ?= y
++CONFIG_MALI_MIDGARD=m
++CONFIG_MALI_DDK_VERSION=y
++CONFIG_MALI_PLATFORM_NAME="devicetree"
++CONFIG_MALI_EXPERT=y
++CONFIG_MALI_DEBUG=y
++CONFIG_MALI_NO_MALI=y
++
++# All Mali CONFIG should be listed here
++CONFIGS += \
++    CONFIG_MALI_DDK_VERSION \
++    CONFIG_MALI_MIDGARD \
++    CONFIG_MALI_GATOR_SUPPORT \
++    CONFIG_MALI_ARBITER_SUPPORT \
++    CONFIG_MALI_ARBITRATION \
++    CONFIG_MALI_PARTITION_MANAGER \
++    CONFIG_MALI_REAL_HW \
++    CONFIG_MALI_DEVFREQ \
++    CONFIG_MALI_MIDGARD_DVFS \
++    CONFIG_MALI_DMA_BUF_MAP_ON_DEMAND \
++    CONFIG_MALI_DMA_BUF_LEGACY_COMPAT \
++    CONFIG_MALI_EXPERT \
++    CONFIG_MALI_CORESTACK \
++    CONFIG_LARGE_PAGE_SUPPORT \
++    CONFIG_MALI_JOB_DUMP \
++    CONFIG_MALI_NO_MALI \
++    CONFIG_MALI_ERROR_INJECT \
++    CONFIG_MALI_PRFCNT_SET_PRIMARY \
++    CONFIG_MALI_PRFCNT_SET_SECONDARY \
++    CONFIG_MALI_PRFCNT_SET_TERTIARY \
++    CONFIG_MALI_PRFCNT_SET_SELECT_VIA_DEBUG_FS \
++    CONFIG_MALI_DEBUG \
++    CONFIG_MALI_MIDGARD_ENABLE_TRACE \
++    CONFIG_MALI_SYSTEM_TRACE \
++    CONFIG_MALI_FENCE_DEBUG \
++    CONFIG_MALI_2MB_ALLOC \
++    CONFIG_MALI_PWRSOFT_765 \
++    CONFIG_MALI_PRFCNT_SET_SECONDARY \
++    CONFIG_MALI_KUTF \
++    CONFIG_MALI_DMA_FENCE \
++    CONFIG_MALI_CSF_SUPPORT \
++    CONFIG_MALI_MEMORY_FULLY_BACKED \
++    CONFIG_MALI_GEM5_BUILD
+ 
+-                ifeq ($(CONFIG_SYNC_FILE), y)
+-                    CONFIG_MALI_FENCE_DEBUG ?= y
+-                else
+-                    CONFIG_MALI_FENCE_DEBUG = n
+-                endif
+-            else
+-                # Prevent misuse when CONFIG_MALI_DEBUG=n
+-                CONFIG_MALI_MIDGARD_ENABLE_TRACE = n
+-                CONFIG_MALI_SYSTEM_TRACE = n
+-                CONFIG_MALI_FENCE_DEBUG = n
+-            endif
+-        else
+-            # Prevent misuse when CONFIG_MALI_EXPERT=n
+-            CONFIG_MALI_CORESTACK = n
+-            CONFIG_LARGE_PAGE_SUPPORT = y
+-            CONFIG_MALI_PWRSOFT_765 = n
+-            CONFIG_MALI_JOB_DUMP = n
+-            CONFIG_MALI_NO_MALI = n
+-            CONFIG_MALI_REAL_HW = y
+-            CONFIG_MALI_ERROR_INJECT = n
+-            CONFIG_MALI_HW_ERRATA_1485982_NOT_AFFECTED = n
+-            CONFIG_MALI_HW_ERRATA_1485982_USE_CLOCK_ALTERNATIVE = n
+-            CONFIG_MALI_PRFCNT_SET_SELECT_VIA_DEBUG_FS = n
+-            CONFIG_MALI_DEBUG = n
+-            CONFIG_MALI_MIDGARD_ENABLE_TRACE = n
+-            CONFIG_MALI_SYSTEM_TRACE = n
+-            CONFIG_MALI_FENCE_DEBUG = n
+-        endif
+-
+-        ifeq ($(CONFIG_MALI_DEBUG), y)
+-            CONFIG_MALI_KUTF ?= y
+-            ifeq ($(CONFIG_MALI_KUTF), y)
+-                CONFIG_MALI_KUTF_IRQ_TEST ?= y
+-                CONFIG_MALI_KUTF_CLK_RATE_TRACE ?= y
+-                CONFIG_MALI_KUTF_MGM_INTEGRATION_TEST ?= y
+-                ifeq ($(CONFIG_MALI_DEVFREQ), y)
+-                    ifeq ($(CONFIG_MALI_NO_MALI), y)
+-                        CONFIG_MALI_KUTF_IPA_UNIT_TEST ?= y
+-                    endif
+-                endif
+-
+-            else
+-                # Prevent misuse when CONFIG_MALI_KUTF=n
+-                CONFIG_MALI_KUTF_IRQ_TEST = n
+-                CONFIG_MALI_KUTF_CLK_RATE_TRACE = n
+-                CONFIG_MALI_KUTF_MGM_INTEGRATION_TEST = n
+-            endif
+-        else
+-            # Prevent misuse when CONFIG_MALI_DEBUG=n
+-            CONFIG_MALI_KUTF = n
+-            CONFIG_MALI_KUTF_IRQ_TEST = n
+-            CONFIG_MALI_KUTF_CLK_RATE_TRACE = n
+-            CONFIG_MALI_KUTF_MGM_INTEGRATION_TEST = n
+-        endif
+-    else
+-        # Prevent misuse when CONFIG_MALI_MIDGARD=n
+-        CONFIG_MALI_ARBITRATION = n
+-        CONFIG_MALI_KUTF = n
+-        CONFIG_MALI_KUTF_IRQ_TEST = n
+-        CONFIG_MALI_KUTF_CLK_RATE_TRACE = n
+-        CONFIG_MALI_KUTF_MGM_INTEGRATION_TEST = n
+-    endif
+-
+-    # All Mali CONFIG should be listed here
+-    CONFIGS += \
+-        CONFIG_MALI_MIDGARD \
+-        CONFIG_MALI_CSF_SUPPORT \
+-        CONFIG_MALI_GATOR_SUPPORT \
+-        CONFIG_MALI_ARBITER_SUPPORT \
+-        CONFIG_MALI_ARBITRATION \
+-        CONFIG_MALI_PARTITION_MANAGER \
+-        CONFIG_MALI_REAL_HW \
+-        CONFIG_MALI_DEVFREQ \
+-        CONFIG_MALI_MIDGARD_DVFS \
+-        CONFIG_MALI_DMA_BUF_MAP_ON_DEMAND \
+-        CONFIG_MALI_DMA_BUF_LEGACY_COMPAT \
+-        CONFIG_MALI_EXPERT \
+-        CONFIG_MALI_CORESTACK \
+-        CONFIG_LARGE_PAGE_SUPPORT \
+-        CONFIG_MALI_PWRSOFT_765 \
+-        CONFIG_MALI_JOB_DUMP \
+-        CONFIG_MALI_NO_MALI \
+-        CONFIG_MALI_ERROR_INJECT \
+-        CONFIG_MALI_HW_ERRATA_1485982_NOT_AFFECTED \
+-        CONFIG_MALI_HW_ERRATA_1485982_USE_CLOCK_ALTERNATIVE \
+-        CONFIG_MALI_PRFCNT_SET_PRIMARY \
+-        CONFIG_MALI_PRFCNT_SET_SECONDARY \
+-        CONFIG_MALI_PRFCNT_SET_TERTIARY \
+-        CONFIG_MALI_PRFCNT_SET_SELECT_VIA_DEBUG_FS \
+-        CONFIG_MALI_DEBUG \
+-        CONFIG_MALI_MIDGARD_ENABLE_TRACE \
+-        CONFIG_MALI_SYSTEM_TRACE \
+-        CONFIG_MALI_FENCE_DEBUG \
+-        CONFIG_MALI_KUTF \
+-        CONFIG_MALI_KUTF_IRQ_TEST \
+-        CONFIG_MALI_KUTF_CLK_RATE_TRACE \
+-        CONFIG_MALI_KUTF_MGM_INTEGRATION_TEST \
+-        CONFIG_MALI_XEN \
+-        CONFIG_MALI_CORESIGHT \
+-        CONFIG_MALI_TRACE_POWER_GPU_WORK_PERIOD
+-
+-
+-
+-endif
+-
+-THIS_DIR := $(dir $(lastword $(MAKEFILE_LIST)))
+--include $(THIS_DIR)/../arbitration/Makefile
+ 
+ # MAKE_ARGS to pass the custom CONFIGs on out-of-tree build
+ #
+@@ -227,15 +99,6 @@ ifeq ($(MALI_KCONFIG_EXT_PREFIX),)
+     EXTRA_CFLAGS += -DCONFIG_MALI_NO_MALI_DEFAULT_GPU='\"$(CONFIG_MALI_NO_MALI_DEFAULT_GPU)\"'
+ endif
+ 
+-#
+-# KBUILD_EXTRA_SYMBOLS to prevent warnings about unknown functions
+-#
+-BASE_SYMBOLS =
+-
+-
+-EXTRA_SYMBOLS += \
+-    $(BASE_SYMBOLS)
+-
+ CFLAGS_MODULE += -Wall -Werror
+ 
+ # The following were added to align with W=1 in scripts/Makefile.extrawarn
+@@ -293,8 +156,5 @@ endif
+ all:
+ 	$(MAKE) -C $(KDIR) M=$(M) $(MAKE_ARGS) EXTRA_CFLAGS="$(EXTRA_CFLAGS)" KBUILD_EXTRA_SYMBOLS="$(EXTRA_SYMBOLS)" modules
+ 
+-modules_install:
+-	$(MAKE) -C $(KDIR) M=$(M) $(MAKE_ARGS) modules_install
+-
+ clean:
+ 	$(MAKE) -C $(KDIR) M=$(M) $(MAKE_ARGS) clean
+diff --git a/driver/product/kernel/drivers/gpu/arm/midgard/csf/mali_kbase_csf.c b/driver/product/kernel/drivers/gpu/arm/midgard/csf/mali_kbase_csf.c
+index a8b5052..06dae4e 100644
+--- a/driver/product/kernel/drivers/gpu/arm/midgard/csf/mali_kbase_csf.c
++++ b/driver/product/kernel/drivers/gpu/arm/midgard/csf/mali_kbase_csf.c
+@@ -2939,7 +2939,7 @@ static void order_job_irq_clear_with_iface_mem_read(void)
+ 	 */
+ 
+ 	/* CPU and GPU would be in the same Outer shareable domain */
+-	dmb(osh);
++	//dmb(osh);
+ }
+ 
+ void kbase_csf_interrupt(struct kbase_device *kbdev, u32 val)
+diff --git a/driver/product/kernel/drivers/gpu/arm/midgard/csf/mali_kbase_csf_firmware_no_mali.c b/driver/product/kernel/drivers/gpu/arm/midgard/csf/mali_kbase_csf_firmware_no_mali.c
+index d0599d6..408d95e 100644
+--- a/driver/product/kernel/drivers/gpu/arm/midgard/csf/mali_kbase_csf_firmware_no_mali.c
++++ b/driver/product/kernel/drivers/gpu/arm/midgard/csf/mali_kbase_csf_firmware_no_mali.c
+@@ -44,7 +44,7 @@
+ #if (KERNEL_VERSION(4, 13, 0) <= LINUX_VERSION_CODE)
+ #include <linux/set_memory.h>
+ #endif
+-#include <asm/arch_timer.h>
++//#include <asm/arch_timer.h>
+ 
+ #ifdef CONFIG_MALI_DEBUG
+ /* Makes Driver wait indefinitely for an acknowledgment for the different
+diff --git a/driver/product/kernel/drivers/gpu/arm/midgard/platform/devicetree/mali_kbase_clk_rate_trace.c b/driver/product/kernel/drivers/gpu/arm/midgard/platform/devicetree/mali_kbase_clk_rate_trace.c
+index f0995a4..93d0fab 100644
+--- a/driver/product/kernel/drivers/gpu/arm/midgard/platform/devicetree/mali_kbase_clk_rate_trace.c
++++ b/driver/product/kernel/drivers/gpu/arm/midgard/platform/devicetree/mali_kbase_clk_rate_trace.c
+@@ -25,7 +25,7 @@
+ #include "mali_kbase_config_platform.h"
+ 
+ #if MALI_USE_CSF
+-#include <asm/arch_timer.h>
++//#include <asm/arch_timer.h>
+ #endif
+ 
+ static void *enumerate_gpu_clk(struct kbase_device *kbdev, unsigned int index)
+@@ -59,7 +59,8 @@ static unsigned long get_gpu_clk_rate(struct kbase_device *kbdev, void *gpu_clk_
+ 	 * throughout. It can be removed after GPUCORE-25693.
+ 	 */
+ 	if (of_machine_is_compatible("arm,juno"))
+-		return arch_timer_get_cntfrq();
++		return NSEC_PER_SEC;
++		//return arch_timer_get_cntfrq();
+ #endif
+ 
+ 	return clk_get_rate((struct clk *)gpu_clk_handle);
+diff --git a/driver/product/kernel/drivers/gpu/arm/midgard/platform/devicetree/mali_kbase_runtime_pm.c b/driver/product/kernel/drivers/gpu/arm/midgard/platform/devicetree/mali_kbase_runtime_pm.c
+index 7c92505..7a09a32 100644
+--- a/driver/product/kernel/drivers/gpu/arm/midgard/platform/devicetree/mali_kbase_runtime_pm.c
++++ b/driver/product/kernel/drivers/gpu/arm/midgard/platform/devicetree/mali_kbase_runtime_pm.c
+@@ -59,7 +59,6 @@ static void disable_gpu_power_control(struct kbase_device *kbdev)
+ 			;
+ 		else if (__clk_is_enabled(kbdev->clocks[i])) {
+ 			clk_disable_unprepare(kbdev->clocks[i]);
+-			WARN_ON(__clk_is_enabled(kbdev->clocks[i]));
+ 		}
+ 	}
+ 
+@@ -216,9 +215,11 @@ static int kbase_device_runtime_init(struct kbase_device *kbdev)
+ 		dev_warn(kbdev->dev, "pm_runtime not enabled");
+ 		ret = -EINVAL;
+ 	} else if (atomic_read(&kbdev->dev->power.usage_count)) {
++#if 0
+ 		dev_warn(kbdev->dev, "%s: Device runtime usage count unexpectedly non zero %d",
+ 			 __func__, atomic_read(&kbdev->dev->power.usage_count));
+ 		ret = -EINVAL;
++#endif
+ 	}
+ 
+ 	return ret;
+@@ -226,11 +227,13 @@ static int kbase_device_runtime_init(struct kbase_device *kbdev)
+ 
+ static void kbase_device_runtime_disable(struct kbase_device *kbdev)
+ {
++#if 0
+ 	dev_dbg(kbdev->dev, "%s\n", __func__);
+ 
+ 	if (atomic_read(&kbdev->dev->power.usage_count))
+ 		dev_warn(kbdev->dev, "%s: Device runtime usage count unexpectedly non zero %d",
+ 			 __func__, atomic_read(&kbdev->dev->power.usage_count));
++#endif
+ 
+ 	pm_runtime_disable(kbdev->dev);
+ }
+diff --git a/driver/product/kernel/drivers/gpu/arm/midgard/platform/meson/mali_kbase_runtime_pm.c b/driver/product/kernel/drivers/gpu/arm/midgard/platform/meson/mali_kbase_runtime_pm.c
+index bd3b4b5..b8146c1 100644
+--- a/driver/product/kernel/drivers/gpu/arm/midgard/platform/meson/mali_kbase_runtime_pm.c
++++ b/driver/product/kernel/drivers/gpu/arm/midgard/platform/meson/mali_kbase_runtime_pm.c
+@@ -194,9 +194,11 @@ static int kbase_device_runtime_init(struct kbase_device *kbdev)
+ 		dev_warn(kbdev->dev, "pm_runtime not enabled");
+ 		ret = -EINVAL;
+ 	} else if (atomic_read(&kbdev->dev->power.usage_count)) {
++#if 0
+ 		dev_warn(kbdev->dev, "%s: Device runtime usage count unexpectedly non zero %d",
+ 			 __func__, atomic_read(&kbdev->dev->power.usage_count));
+ 		ret = -EINVAL;
++#endif
+ 	}
+ 
+ 	/* allocate resources for reset */
+@@ -208,11 +210,13 @@ static int kbase_device_runtime_init(struct kbase_device *kbdev)
+ 
+ static void kbase_device_runtime_disable(struct kbase_device *kbdev)
+ {
++#if 0
+ 	dev_dbg(kbdev->dev, "%s\n", __func__);
+ 
+ 	if (atomic_read(&kbdev->dev->power.usage_count))
+ 		dev_warn(kbdev->dev, "%s: Device runtime usage count unexpectedly non zero %d",
+ 			 __func__, atomic_read(&kbdev->dev->power.usage_count));
++#endif
+ 
+ 	pm_runtime_disable(kbdev->dev);
+ }

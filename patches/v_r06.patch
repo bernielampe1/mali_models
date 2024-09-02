@@ -1,0 +1,737 @@
+diff --git a/driver/product/kernel/drivers/gpu/arm/midgard/.mali_kbase_sync_file.c.swp b/driver/product/kernel/drivers/gpu/arm/midgard/.mali_kbase_sync_file.c.swp
+new file mode 100644
+index 0000000..e69de29
+diff --git a/driver/product/kernel/drivers/gpu/arm/midgard/Kbuild b/driver/product/kernel/drivers/gpu/arm/midgard/Kbuild
+index eb01993..a682a8d 100644
+--- a/driver/product/kernel/drivers/gpu/arm/midgard/Kbuild
++++ b/driver/product/kernel/drivers/gpu/arm/midgard/Kbuild
+@@ -72,7 +72,7 @@ DEFINES += -I$(srctree)/drivers/staging/android
+ ccflags-y += $(DEFINES) -I$(KBASE_PATH)   -I$(KBASE_PLATFORM_PATH) -I$(UMP_PATH) -I$(srctree)/include/linux
+ subdir-ccflags-y += $(DEFINES) -I$(KBASE_PATH)   -I$(KBASE_PLATFORM_PATH) -I$(OSK_PATH) -I$(UMP_PATH) -I$(srctree)/include/linux
+ 
+-SRC := \
++SRC := mali_kbase_platform_fake.c \
+ 	mali_kbase_device.c \
+ 	mali_kbase_cache_policy.c \
+ 	mali_kbase_mem.c \
+diff --git a/driver/product/kernel/drivers/gpu/arm/midgard/Makefile b/driver/product/kernel/drivers/gpu/arm/midgard/Makefile
+index 9aa242c..402cde2 100644
+--- a/driver/product/kernel/drivers/gpu/arm/midgard/Makefile
++++ b/driver/product/kernel/drivers/gpu/arm/midgard/Makefile
+@@ -1,42 +1,160 @@
++# SPDX-License-Identifier: GPL-2.0 WITH Linux-syscall-note
+ #
+-# (C) COPYRIGHT 2010-2016, 2017 ARM Limited. All rights reserved.
++# (C) COPYRIGHT 2010-2023 ARM Limited. All rights reserved.
+ #
+ # This program is free software and is provided to you under the terms of the
+ # GNU General Public License version 2 as published by the Free Software
+ # Foundation, and any use by you of this program is subject to the terms
+-# of such GNU licence.
++# of such GNU license.
+ #
+-# A copy of the licence is included with the program, and can also be obtained
+-# from Free Software Foundation, Inc., 51 Franklin Street, Fifth Floor,
+-# Boston, MA  02110-1301, USA.
++# This program is distributed in the hope that it will be useful,
++# but WITHOUT ANY WARRANTY; without even the implied warranty of
++# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
++# GNU General Public License for more details.
+ #
++# You should have received a copy of the GNU General Public License
++# along with this program; if not, you can access it online at
++# http://www.gnu.org/licenses/gpl-2.0.html.
+ #
+ 
++KERNEL_SRC ?= /lib/modules/$(shell uname -r)/build
++KDIR ?= $(KERNEL_SRC)
++M ?= $(shell pwd)
++
++ifeq ($(KDIR),)
++    $(error Must specify KDIR to point to the kernel to target))
++endif
++
++CONFIG_MALI_MIDGARD=m
++CONFIG_MALI_DDK_VERSION=y
++CONFIG_MALI_PLATFORM_NAME="devicetree"
++CONFIG_MALI_EXPERT=y
++CONFIG_MALI_DEBUG=y
++CONFIG_MALI_NO_MALI=y
++
++# All Mali CONFIG should be listed here
++CONFIGS += \
++    CONFIG_MALI_DDK_VERSION \
++    CONFIG_MALI_MIDGARD \
++    CONFIG_MALI_GATOR_SUPPORT \
++    CONFIG_MALI_ARBITER_SUPPORT \
++    CONFIG_MALI_ARBITRATION \
++    CONFIG_MALI_PARTITION_MANAGER \
++    CONFIG_MALI_REAL_HW \
++    CONFIG_MALI_DEVFREQ \
++    CONFIG_MALI_MIDGARD_DVFS \
++    CONFIG_MALI_DMA_BUF_MAP_ON_DEMAND \
++    CONFIG_MALI_DMA_BUF_LEGACY_COMPAT \
++    CONFIG_MALI_EXPERT \
++    CONFIG_MALI_CORESTACK \
++    CONFIG_LARGE_PAGE_SUPPORT \
++    CONFIG_MALI_JOB_DUMP \
++    CONFIG_MALI_NO_MALI \
++    CONFIG_MALI_ERROR_INJECT \
++    CONFIG_MALI_PRFCNT_SET_PRIMARY \
++    CONFIG_MALI_PRFCNT_SET_SECONDARY \
++    CONFIG_MALI_PRFCNT_SET_TERTIARY \
++    CONFIG_MALI_PRFCNT_SET_SELECT_VIA_DEBUG_FS \
++    CONFIG_MALI_DEBUG \
++    CONFIG_MALI_MIDGARD_ENABLE_TRACE \
++    CONFIG_MALI_SYSTEM_TRACE \
++    CONFIG_MALI_FENCE_DEBUG \
++    CONFIG_MALI_2MB_ALLOC \
++    CONFIG_MALI_PWRSOFT_765 \
++    CONFIG_MALI_PRFCNT_SET_SECONDARY \
++    CONFIG_MALI_KUTF \
++    CONFIG_MALI_DMA_FENCE \
++    CONFIG_MALI_CSF_SUPPORT \
++    CONFIG_MALI_MEMORY_FULLY_BACKED \
++    CONFIG_MALI_GEM5_BUILD
+ 
+ 
+-KDIR ?= /lib/modules/$(shell uname -r)/build
++# MAKE_ARGS to pass the custom CONFIGs on out-of-tree build
++#
++# Generate the list of CONFIGs and values.
++# $(value config) is the name of the CONFIG option.
++# $(value $(value config)) is its value (y, m).
++# When the CONFIG is not set to y or m, it defaults to n.
++MAKE_ARGS := $(foreach config,$(CONFIGS), \
++                    $(if $(filter y m,$(value $(value config))), \
++                        $(value config)=$(value $(value config)), \
++                        $(value config)=n))
++
++ifeq ($(MALI_KCONFIG_EXT_PREFIX),)
++    MAKE_ARGS += CONFIG_MALI_PLATFORM_NAME=$(CONFIG_MALI_PLATFORM_NAME)
++endif
+ 
+-BUSLOG_PATH_RELATIVE = $(CURDIR)/../../../..
+-UMP_PATH_RELATIVE = $(CURDIR)/../../../base/ump
+-KBASE_PATH_RELATIVE = $(CURDIR)
+-KDS_PATH_RELATIVE = $(CURDIR)/../../../..
+-EXTRA_SYMBOLS = $(UMP_PATH_RELATIVE)/src/Module.symvers
++#
++# EXTRA_CFLAGS to define the custom CONFIGs on out-of-tree build
++#
++# Generate the list of CONFIGs defines with values from CONFIGS.
++# $(value config) is the name of the CONFIG option.
++# When set to y or m, the CONFIG gets defined to 1.
++EXTRA_CFLAGS := $(foreach config,$(CONFIGS), \
++                    $(if $(filter y m,$(value $(value config))), \
++                        -D$(value config)=1))
+ 
+-ifeq ($(MALI_UNIT_TEST), 1)
+-	EXTRA_SYMBOLS += $(KBASE_PATH_RELATIVE)/tests/internal/src/kernel_assert_module/linux/Module.symvers
++ifeq ($(MALI_KCONFIG_EXT_PREFIX),)
++    EXTRA_CFLAGS += -DCONFIG_MALI_PLATFORM_NAME='\"$(CONFIG_MALI_PLATFORM_NAME)\"'
++    EXTRA_CFLAGS += -DCONFIG_MALI_NO_MALI_DEFAULT_GPU='\"$(CONFIG_MALI_NO_MALI_DEFAULT_GPU)\"'
+ endif
+ 
+-ifeq ($(MALI_BUS_LOG), 1)
+-#Add bus logger symbols
+-EXTRA_SYMBOLS += $(BUSLOG_PATH_RELATIVE)/drivers/base/bus_logger/Module.symvers
++CFLAGS_MODULE += -Wall -Werror
++
++# The following were added to align with W=1 in scripts/Makefile.extrawarn
++# from the Linux source tree (v5.18.14)
++CFLAGS_MODULE += -Wextra -Wunused -Wno-unused-parameter
++CFLAGS_MODULE += -Wmissing-declarations
++CFLAGS_MODULE += -Wmissing-format-attribute
++CFLAGS_MODULE += -Wmissing-prototypes
++CFLAGS_MODULE += -Wold-style-definition
++# The -Wmissing-include-dirs cannot be enabled as the path to some of the
++# included directories change depending on whether it is an in-tree or
++# out-of-tree build.
++CFLAGS_MODULE += $(call cc-option, -Wunused-but-set-variable)
++CFLAGS_MODULE += $(call cc-option, -Wunused-const-variable)
++CFLAGS_MODULE += $(call cc-option, -Wpacked-not-aligned)
++CFLAGS_MODULE += $(call cc-option, -Wstringop-truncation)
++# The following turn off the warnings enabled by -Wextra
++CFLAGS_MODULE += -Wno-sign-compare
++CFLAGS_MODULE += -Wno-shift-negative-value
++# This flag is needed to avoid build errors on older kernels
++CFLAGS_MODULE += $(call cc-option, -Wno-cast-function-type)
++
++KBUILD_CPPFLAGS += -DKBUILD_EXTRA_WARN1
++
++# The following were added to align with W=2 in scripts/Makefile.extrawarn
++# from the Linux source tree (v5.18.14)
++CFLAGS_MODULE += -Wdisabled-optimization
++# The -Wshadow flag cannot be enabled unless upstream kernels are
++# patched to fix redefinitions of certain built-in functions and
++# global variables.
++CFLAGS_MODULE += $(call cc-option, -Wlogical-op)
++CFLAGS_MODULE += -Wmissing-field-initializers
++# -Wtype-limits must be disabled due to build failures on kernel 5.x
++CFLAGS_MODULE += -Wno-type-limits
++CFLAGS_MODULE += $(call cc-option, -Wmaybe-uninitialized)
++CFLAGS_MODULE += $(call cc-option, -Wunused-macros)
++
++KBUILD_CPPFLAGS += -DKBUILD_EXTRA_WARN2
++
++# This warning is disabled to avoid build failures in some kernel versions
++CFLAGS_MODULE += -Wno-ignored-qualifiers
++
++ifeq ($(CONFIG_GCOV_KERNEL),y)
++    CFLAGS_MODULE += $(call cc-option, -ftest-coverage)
++    CFLAGS_MODULE += $(call cc-option, -fprofile-arcs)
++    EXTRA_CFLAGS += -DGCOV_PROFILE=1
+ endif
+ 
+-# GPL driver supports KDS
+-EXTRA_SYMBOLS += $(KDS_PATH_RELATIVE)/drivers/base/kds/Module.symvers
++ifeq ($(CONFIG_MALI_KCOV),y)
++    CFLAGS_MODULE += $(call cc-option, -fsanitize-coverage=trace-cmp)
++    EXTRA_CFLAGS += -DKCOV=1
++    EXTRA_CFLAGS += -DKCOV_ENABLE_COMPARISONS=1
++endif
+ 
+-# we get the symbols from modules using KBUILD_EXTRA_SYMBOLS to prevent warnings about unknown functions
+ all:
+-	$(MAKE) -C $(KDIR) M=$(CURDIR) EXTRA_CFLAGS="-I$(CURDIR)/../../../../include -I$(CURDIR)/../../../../tests/include $(SCONS_CFLAGS)" $(SCONS_CONFIGS) KBUILD_EXTRA_SYMBOLS="$(EXTRA_SYMBOLS)" modules
++	$(MAKE) -C $(KDIR) M=$(M) $(MAKE_ARGS) EXTRA_CFLAGS="$(EXTRA_CFLAGS)" KBUILD_EXTRA_SYMBOLS="$(EXTRA_SYMBOLS)" modules
+ 
+ clean:
+-	$(MAKE) -C $(KDIR) M=$(CURDIR) clean
++	$(MAKE) -C $(KDIR) M=$(M) $(MAKE_ARGS) clean
+diff --git a/driver/product/kernel/drivers/gpu/arm/midgard/backend/gpu/Kbuild b/driver/product/kernel/drivers/gpu/arm/midgard/backend/gpu/Kbuild
+index 5f700e9..925fe8f 100644
+--- a/driver/product/kernel/drivers/gpu/arm/midgard/backend/gpu/Kbuild
++++ b/driver/product/kernel/drivers/gpu/arm/midgard/backend/gpu/Kbuild
+@@ -54,7 +54,7 @@ endif
+ ifeq ($(CONFIG_MALI_NO_MALI),y)
+ 	# Dummy model
+ 	BACKEND += backend/gpu/mali_kbase_model_dummy.c
+-	BACKEND += backend/gpu/mali_kbase_model_linux.c
++	#BACKEND += backend/gpu/mali_kbase_model_linux.c
+ 	# HW error simulation
+-	BACKEND += backend/gpu/mali_kbase_model_error_generator.c
++	#BACKEND += backend/gpu/mali_kbase_model_error_generator.c
+ endif
+diff --git a/driver/product/kernel/drivers/gpu/arm/midgard/backend/gpu/mali_kbase_model_dummy.c b/driver/product/kernel/drivers/gpu/arm/midgard/backend/gpu/mali_kbase_model_dummy.c
+new file mode 100644
+index 0000000..fbbdb8a
+--- /dev/null
++++ b/driver/product/kernel/drivers/gpu/arm/midgard/backend/gpu/mali_kbase_model_dummy.c
+@@ -0,0 +1,153 @@
++#ifndef KBASE_MODEL_DUMMY_H_
++#define KBASE_MODEL_DUMMY_H_
++
++#include<mali_kbase.h>
++
++// Taken from https://github.com/ARM-software/nomali-model
++
++#define REGISTER_SPACE_SIZE_DTS 0x5000
++static u32 dummy_regs[REGISTER_SPACE_SIZE_DTS]; // size taken from dts file boot/dts/exynos/exynos9830.dts
++
++void clear_gpu(void) {
++    // dummy clear
++    int i = 0;
++    while(i < REGISTER_SPACE_SIZE_DTS) {
++        dummy_regs[i++] = 0;
++    }
++}
++
++// Register mapping comes from mali_midg_regmap.h and mali_midg_regmap_jm.h
++
++int kbase_gpu_device_create(struct kbase_device *kbdev) {
++    clear_gpu();
++
++    // gpu id is used to find hw issues and workaround functions
++    // look as mali_kbase_hw.c: kbase_hw_get_issues_for_new_id() for hardcoded arch/product/verions
++    dummy_regs[GPU_CONTROL_REG(GPU_ID)] = GPU_ID2_MAKE(6, 0, 0, 0, 0, 1, 0);
++
++    dummy_regs[GPU_CONTROL_REG(L2_FEATURES)] =
++        (0x07 << 24) |  // lg2 ext bus width
++        (0x13 << 16) |  // lg2 cache size
++        (0x02 << 8) |   // lg2 associativity
++        (0x06);         // lg2 line size
++
++    dummy_regs[GPU_CONTROL_REG(TILER_FEATURES)] =
++        (0x8 << 8) |    // Maximum no active hierarchy levels
++        0x09;           // lg2 bin size
++
++    /* Coherent core group, but incoherent supergroup. 1 L2 slice. */
++    dummy_regs[GPU_CONTROL_REG(MEM_FEATURES)] = 0x1;
++
++    dummy_regs[GPU_CONTROL_REG(MMU_FEATURES)] = 0x2830;
++    dummy_regs[GPU_CONTROL_REG(AS_PRESENT)] = 0xff;
++    dummy_regs[GPU_CONTROL_REG(JS_PRESENT)] = 0x7;
++    dummy_regs[GPU_CONTROL_REG(JS0_FEATURES)] = 0x20e;
++    dummy_regs[GPU_CONTROL_REG(JS1_FEATURES)] = 0x1fe;
++    dummy_regs[GPU_CONTROL_REG(JS2_FEATURES)] = 0x7e;
++
++    dummy_regs[GPU_CONTROL_REG(TEXTURE_FEATURES_0)] = 0x00fe001e;
++    dummy_regs[GPU_CONTROL_REG(TEXTURE_FEATURES_1)] = 0xffff;
++    dummy_regs[GPU_CONTROL_REG(TEXTURE_FEATURES_2)] = 0x9f81ffff;
++
++    dummy_regs[GPU_CONTROL_REG(THREAD_MAX_THREADS)] = 0x100;
++    dummy_regs[GPU_CONTROL_REG(THREAD_MAX_WORKGROUP_SIZE)] = 0x100;
++    dummy_regs[GPU_CONTROL_REG(THREAD_MAX_BARRIER_SIZE)] = 0x100;
++    dummy_regs[GPU_CONTROL_REG(THREAD_FEATURES)] = 0x0a040400;
++
++    dummy_regs[GPU_CONTROL_REG(SHADER_PRESENT_LO)] = 0xf; // 64 bit register, but only set low word
++    dummy_regs[GPU_CONTROL_REG(TILER_PRESENT_LO)] = 0x1; // 64 bit register, but only set low word
++    dummy_regs[GPU_CONTROL_REG(L2_PRESENT_LO)] = 0x1; // 64 bit register, but only set low word
++
++    return 0;
++}
++
++int gpu_device_create(struct kbase_device *kbdev) {
++    return kbase_gpu_device_create(kbdev);
++}
++
++void kbase_gpu_device_destroy(struct kbase_device *kbdex) {
++    clear_gpu();
++    return;
++}
++
++void gpu_device_destroy(struct kbase_device *kbdex) {
++    kbase_gpu_device_destroy(kbdex);
++    return;
++}
++
++unsigned int kbase_reg_read(struct kbase_device *kbdev, u32 offset)
++{
++    if (offset == GPU_CONTROL_REG(GPU_IRQ_STATUS)) {
++        return dummy_regs[offset] & dummy_regs[GPU_CONTROL_REG(GPU_IRQ_MASK)];
++    }
++    else if (offset == JOB_CONTROL_REG(JOB_IRQ_STATUS)) {
++        return dummy_regs[offset] & dummy_regs[JOB_CONTROL_REG(JOB_IRQ_MASK)];
++    }
++    else if (offset == MMU_REG(MMU_IRQ_STATUS)) {
++        return dummy_regs[offset] & dummy_regs[MMU_REG(MMU_IRQ_MASK)];
++    }
++
++    return dummy_regs[offset];
++}
++
++void kbase_reg_write(struct kbase_device *kbdev, u32 offset, u32 value) {
++    dummy_regs[offset] = value;
++
++    // just mark all jobs done successfully all the time
++    dummy_regs[JOB_SLOT_REG(0, JS_STATUS)] = 0;
++    dummy_regs[JOB_SLOT_REG(1, JS_STATUS)] = 0;
++    dummy_regs[JOB_SLOT_REG(2, JS_STATUS)] = 0;
++    dummy_regs[JOB_SLOT_REG(3, JS_STATUS)] = 0;
++    dummy_regs[JOB_SLOT_REG(4, JS_STATUS)] = 0;
++    dummy_regs[JOB_SLOT_REG(5, JS_STATUS)] = 0;
++    dummy_regs[JOB_SLOT_REG(6, JS_STATUS)] = 0;
++    dummy_regs[JOB_SLOT_REG(7, JS_STATUS)] = 0;
++    dummy_regs[JOB_SLOT_REG(8, JS_STATUS)] = 0;
++    dummy_regs[JOB_SLOT_REG(9, JS_STATUS)] = 0;
++    dummy_regs[JOB_SLOT_REG(10, JS_STATUS)] = 0;
++    dummy_regs[JOB_SLOT_REG(11, JS_STATUS)] = 0;
++    dummy_regs[JOB_SLOT_REG(12, JS_STATUS)] = 0;
++    dummy_regs[JOB_SLOT_REG(13, JS_STATUS)] = 0;
++    dummy_regs[JOB_SLOT_REG(14, JS_STATUS)] = 0;
++    dummy_regs[JOB_SLOT_REG(15, JS_STATUS)] = 0;
++}
++
++bool kbase_is_gpu_removed(struct kbase_device *kbdev)
++{
++    return 0;
++}
++
++void gpu_model_set_dummy_prfcnt_sample(unsigned int *data, unsigned int size)
++{
++    return;
++}
++
++void gpu_model_set_dummy_prfcnt_base_cpu(void *p)
++{
++    return;
++} 
++
++void kbase_synchronize_irqs(struct kbase_device *kbdev)
++{
++    return;
++}
++
++int kbase_install_interrupts(struct kbase_device *kbdev)
++{
++    return 0;
++}
++
++void kbase_release_interrupts(struct kbase_device *kbdev)
++{
++    return;
++}
++
++
++int kbase_platform_early_init(void)
++{
++    /* Nothing needed at this stage */
++    return 0;
++}
++
++
++#endif /* KBASE_MODEL_DUMMY_H_ */
+diff --git a/driver/product/kernel/drivers/gpu/arm/midgard/backend/gpu/mali_kbase_model_dummy.h b/driver/product/kernel/drivers/gpu/arm/midgard/backend/gpu/mali_kbase_model_dummy.h
+new file mode 100644
+index 0000000..1ffa6ee
+--- /dev/null
++++ b/driver/product/kernel/drivers/gpu/arm/midgard/backend/gpu/mali_kbase_model_dummy.h
+@@ -0,0 +1,38 @@
++#ifndef __MALI_KBASE_MODEL_DUMMY_H__
++#define __MALI_KBASE_MODEL_DUMMY_H__
++
++#include<mali_kbase.h>
++
++/*
++ * This file is strickly a hack to get the driver compiled and loaded in
++ * a paux linux kernel running in qemu. It does not work
++ */
++
++#define KBASE_DUMMY_MODEL_MAX_MEMSYS_BLOCKS 32
++#define KBASE_DUMMY_MODEL_MAX_SHADER_CORES 1
++
++
++void gpu_model_set_dummy_prfcnt_base_cpu(void *dump_va);
++//int kbase_gpu_device_create(struct kbase_device *kbdev);
++//void kbase_gpu_device_destroy(struct kbase_device *kbdex);
++//int gpu_device_create(struct kbase_device *kbdev);
++//void gpu_device_destroy(struct kbase_device *kbdex);
++void gpu_model_set_dummy_prfcnt_sample(unsigned int *data, unsigned int size);
++
++// hack taken from soc/samsung/cal-if/pwrcal.h
++struct dvfs_rate_volt {
++    unsigned long rate;
++    unsigned int volt;
++};
++
++unsigned int cal_dfs_get_lv_num(unsigned int id);
++
++int cal_dfs_get_rate_asv_table(unsigned int id,
++                    struct dvfs_rate_volt *table);
++
++unsigned long cal_dfs_get_rate(unsigned int id);
++
++
++unsigned long cal_dfs_set_rate(unsigned int id, unsigned long rate);
++
++#endif
+diff --git a/driver/product/kernel/drivers/gpu/arm/midgard/backend/gpu/mali_kbase_pm_driver.c b/driver/product/kernel/drivers/gpu/arm/midgard/backend/gpu/mali_kbase_pm_driver.c
+index ed19a8a..c2e118a 100644
+--- a/driver/product/kernel/drivers/gpu/arm/midgard/backend/gpu/mali_kbase_pm_driver.c
++++ b/driver/product/kernel/drivers/gpu/arm/midgard/backend/gpu/mali_kbase_pm_driver.c
+@@ -1395,7 +1395,7 @@ static int kbase_pm_do_reset(struct kbase_device *kbdev)
+ 		dev_err(kbdev->dev, "Reset interrupt didn't reach CPU. Check interrupt assignments.\n");
+ 		/* If interrupts aren't working we can't continue. */
+ 		destroy_hrtimer_on_stack(&rtdata.timer);
+-		return -EINVAL;
++		return 0;
+ 	}
+ 
+ 	/* The GPU doesn't seem to be responding to the reset so try a hard
+@@ -1427,7 +1427,7 @@ static int kbase_pm_do_reset(struct kbase_device *kbdev)
+ 	dev_err(kbdev->dev, "Failed to hard-reset the GPU (timed out after %d ms)\n",
+ 								RESET_TIMEOUT);
+ 
+-	return -EINVAL;
++	return 0;
+ }
+ 
+ static int kbasep_protected_mode_enable(struct protected_mode_device *pdev)
+diff --git a/driver/product/kernel/drivers/gpu/arm/midgard/mali_kbase_context.c b/driver/product/kernel/drivers/gpu/arm/midgard/mali_kbase_context.c
+index 4e802bc..02d9bfe 100644
+--- a/driver/product/kernel/drivers/gpu/arm/midgard/mali_kbase_context.c
++++ b/driver/product/kernel/drivers/gpu/arm/midgard/mali_kbase_context.c
+@@ -153,9 +153,8 @@ kbase_create_context(struct kbase_device *kbdev, bool is_compat)
+ 
+ 	mutex_init(&kctx->vinstr_cli_lock);
+ 
+-	setup_timer(&kctx->soft_job_timeout,
+-		    kbasep_soft_job_timeout_worker,
+-		    (uintptr_t)kctx);
++    kbase_timer_setup(&kctx->soft_job_timeout,
++              (void(*)(struct timer_list *))kbasep_soft_job_timeout_worker);
+ 
+ 	return kctx;
+ 
+diff --git a/driver/product/kernel/drivers/gpu/arm/midgard/mali_kbase_core_linux.c b/driver/product/kernel/drivers/gpu/arm/midgard/mali_kbase_core_linux.c
+index c076300..9ca9726 100644
+--- a/driver/product/kernel/drivers/gpu/arm/midgard/mali_kbase_core_linux.c
++++ b/driver/product/kernel/drivers/gpu/arm/midgard/mali_kbase_core_linux.c
+@@ -747,7 +747,7 @@ copy_failed:
+ 
+ 	case KBASE_FUNC_MODEL_CONTROL:
+ 		{
+-#ifdef CONFIG_MALI_NO_MALI
++#if 0
+ 			unsigned long flags;
+ 			struct kbase_model_control_params params =
+ 					((struct kbase_uk_model_control_params *)args)->params;
+@@ -1143,7 +1143,7 @@ static int kbase_open(struct inode *inode, struct file *filp)
+ 	if (!kbdev)
+ 		return -ENODEV;
+ 
+-	kctx = kbase_create_context(kbdev, is_compat_task());
++	kctx = kbase_create_context(kbdev, in_compat_syscall());
+ 	if (!kctx) {
+ 		ret = -ENOMEM;
+ 		goto out;
+diff --git a/driver/product/kernel/drivers/gpu/arm/midgard/mali_kbase_fence.h b/driver/product/kernel/drivers/gpu/arm/midgard/mali_kbase_fence.h
+index 8d39299..9b9d825 100644
+--- a/driver/product/kernel/drivers/gpu/arm/midgard/mali_kbase_fence.h
++++ b/driver/product/kernel/drivers/gpu/arm/midgard/mali_kbase_fence.h
+@@ -134,7 +134,11 @@ static inline bool kbase_fence_out_is_ours(struct kbase_jd_atom *katom)
+ static inline int kbase_fence_out_signal(struct kbase_jd_atom *katom,
+ 					 int status)
+ {
+-	katom->dma_fence.fence->status = status;
++#if (LINUX_VERSION_CODE >= KERNEL_VERSION(4, 11, 0))
++    katom->dma_fence.fence->error = status;
++#else
++    katom->dma_fence.fence->status = status;
++#endif
+ 	return dma_fence_signal(katom->dma_fence.fence);
+ }
+ 
+diff --git a/driver/product/kernel/drivers/gpu/arm/midgard/mali_kbase_mem.c b/driver/product/kernel/drivers/gpu/arm/midgard/mali_kbase_mem.c
+index e76294d..affa89b 100644
+--- a/driver/product/kernel/drivers/gpu/arm/midgard/mali_kbase_mem.c
++++ b/driver/product/kernel/drivers/gpu/arm/midgard/mali_kbase_mem.c
+@@ -31,6 +31,7 @@
+ #include <linux/bug.h>
+ #include <linux/compat.h>
+ #include <linux/version.h>
++#include <linux/sched/mm.h>
+ 
+ #include <mali_kbase_config.h>
+ #include <mali_kbase.h>
+diff --git a/driver/product/kernel/drivers/gpu/arm/midgard/mali_kbase_mem.h b/driver/product/kernel/drivers/gpu/arm/midgard/mali_kbase_mem.h
+index e293577..75f3ad1 100644
+--- a/driver/product/kernel/drivers/gpu/arm/midgard/mali_kbase_mem.h
++++ b/driver/product/kernel/drivers/gpu/arm/midgard/mali_kbase_mem.h
+@@ -559,7 +559,7 @@ void kbase_mem_pool_free_pages(struct kbase_mem_pool *pool, size_t nr_pages,
+  */
+ static inline size_t kbase_mem_pool_size(struct kbase_mem_pool *pool)
+ {
+-	return ACCESS_ONCE(pool->cur_size);
++	return READ_ONCE(pool->cur_size);
+ }
+ 
+ /**
+diff --git a/driver/product/kernel/drivers/gpu/arm/midgard/mali_kbase_mem_linux.c b/driver/product/kernel/drivers/gpu/arm/midgard/mali_kbase_mem_linux.c
+index eea429a..de2fe35 100644
+--- a/driver/product/kernel/drivers/gpu/arm/midgard/mali_kbase_mem_linux.c
++++ b/driver/product/kernel/drivers/gpu/arm/midgard/mali_kbase_mem_linux.c
+@@ -1788,8 +1788,14 @@ static void kbase_cpu_vm_close(struct vm_area_struct *vma)
+ KBASE_EXPORT_TEST_API(kbase_cpu_vm_close);
+ 
+ 
++#if (LINUX_VERSION_CODE < KERNEL_VERSION(4, 11, 0))
+ static int kbase_cpu_vm_fault(struct vm_area_struct *vma, struct vm_fault *vmf)
+ {
++#else
++static int kbase_cpu_vm_fault(struct vm_fault *vmf)
++{
++    struct vm_area_struct *vma = vmf->vma;
++#endif
+ 	struct kbase_cpu_mapping *map = vma->vm_private_data;
+ 	pgoff_t rel_pgoff;
+ 	size_t i;
+diff --git a/driver/product/kernel/drivers/gpu/arm/midgard/mali_kbase_mem_lowlevel.h b/driver/product/kernel/drivers/gpu/arm/midgard/mali_kbase_mem_lowlevel.h
+index 9725fd3..9b76272 100644
+--- a/driver/product/kernel/drivers/gpu/arm/midgard/mali_kbase_mem_lowlevel.h
++++ b/driver/product/kernel/drivers/gpu/arm/midgard/mali_kbase_mem_lowlevel.h
+@@ -37,6 +37,16 @@
+ 
+ #define KBASE_PHY_PAGES_POISON_VALUE  0xFD /** Value to fill the memory with when KBASE_PHY_PAGES_FLAG_POISON is set */
+ 
++/*
++ * Note: if macro for converting physical address to page is not defined
++ * in the kernel itself, it is defined hereby. This is to avoid build errors
++ * which are reported during builds for some architectures.
++ */
++#ifndef phys_to_page
++#define phys_to_page(phys)  (pfn_to_page((phys) >> PAGE_SHIFT))
++#endif
++
++
+ enum kbase_sync_type {
+ 	KBASE_SYNC_TO_CPU,
+ 	KBASE_SYNC_TO_DEVICE
+diff --git a/driver/product/kernel/drivers/gpu/arm/midgard/mali_kbase_model_linux.h b/driver/product/kernel/drivers/gpu/arm/midgard/mali_kbase_model_linux.h
+new file mode 100644
+index 0000000..7761d5a
+--- /dev/null
++++ b/driver/product/kernel/drivers/gpu/arm/midgard/mali_kbase_model_linux.h
+@@ -0,0 +1,10 @@
++
++#ifndef _BASE_MODEL_LINUX_H_
++#define _BASE_MODEL_LINUX_H_
++
++int kbase_gpu_device_create(struct kbase_device *kbdev);
++void kbase_gpu_device_destroy(struct kbase_device *kbdex);
++int gpu_device_create(struct kbase_device *kbdev);
++void gpu_device_destroy(struct kbase_device *kbdex);
++
++#endif
+diff --git a/driver/product/kernel/drivers/gpu/arm/midgard/mali_kbase_sync.h b/driver/product/kernel/drivers/gpu/arm/midgard/mali_kbase_sync.h
+index de72147..33b5805 100644
+--- a/driver/product/kernel/drivers/gpu/arm/midgard/mali_kbase_sync.h
++++ b/driver/product/kernel/drivers/gpu/arm/midgard/mali_kbase_sync.h
+@@ -156,7 +156,7 @@ void kbase_sync_fence_out_remove(struct kbase_jd_atom *katom);
+  */
+ static inline void kbase_sync_fence_close_fd(int fd)
+ {
+-	sys_close(fd);
++	ksys_close(fd);
+ }
+ 
+ /**
+diff --git a/driver/product/kernel/drivers/gpu/arm/midgard/mali_kbase_sync_file.c b/driver/product/kernel/drivers/gpu/arm/midgard/mali_kbase_sync_file.c
+index 4e1621c..30cca30 100644
+--- a/driver/product/kernel/drivers/gpu/arm/midgard/mali_kbase_sync_file.c
++++ b/driver/product/kernel/drivers/gpu/arm/midgard/mali_kbase_sync_file.c
+@@ -161,7 +161,11 @@ static void kbase_fence_wait_callback(struct dma_fence *fence,
+ 	struct kbase_context *kctx = katom->kctx;
+ 
+ 	/* Cancel atom if fence is erroneous */
+-	if (dma_fence_is_signaled(kcb->fence) && kcb->fence->status < 0)
++#if (LINUX_VERSION_CODE >= KERNEL_VERSION(4, 11, 0))
++    if (dma_fence_is_signaled(kcb->fence) && kcb->fence->error)
++#else
++    if (dma_fence_is_signaled(kcb->fence) && kcb->fence->status < 0)
++#endif
+ 		katom->event_code = BASE_JD_EVENT_JOB_CANCELLED;
+ 
+ 	if (kbase_fence_dep_count_dec_and_test(katom)) {
+@@ -273,10 +277,15 @@ static void kbase_sync_fence_info_get(struct dma_fence *fence,
+ 	 * 1 : signaled
+ 	 */
+ 	if (dma_fence_is_signaled(fence)) {
+-		if (fence->status < 0)
+-			info->status = fence->status; /* signaled with error */
+-		else
+-			info->status = 1; /* signaled with success */
++#if (LINUX_VERSION_CODE >= KERNEL_VERSION(4, 11, 0))
++        int status = fence->error;
++#else
++        int status = fence->status;
++#endif
++        if (status < 0)
++            info->status = status; /* signaled with error */
++        else
++            info->status = 1; /* signaled with success */
+ 	} else  {
+ 		info->status = 0; /* still active (unsignaled) */
+ 	}
+diff --git a/driver/product/kernel/drivers/gpu/arm/midgard/mali_kbase_tlstream.c b/driver/product/kernel/drivers/gpu/arm/midgard/mali_kbase_tlstream.c
+index c952993..dbed8ba 100644
+--- a/driver/product/kernel/drivers/gpu/arm/midgard/mali_kbase_tlstream.c
++++ b/driver/product/kernel/drivers/gpu/arm/midgard/mali_kbase_tlstream.c
+@@ -1371,9 +1371,8 @@ int kbase_tlstream_init(void)
+ 
+ 	/* Initialize autoflush timer. */
+ 	atomic_set(&autoflush_timer_active, 0);
+-	setup_timer(&autoflush_timer,
+-			kbasep_tlstream_autoflush_timer_callback,
+-			0);
++    kbase_timer_setup(&autoflush_timer,
++              (void (*)(struct timer_list *))kbasep_tlstream_autoflush_timer_callback);
+ 
+ 	return 0;
+ }
+diff --git a/driver/product/kernel/drivers/gpu/arm/midgard/mali_kbase_uku.h b/driver/product/kernel/drivers/gpu/arm/midgard/mali_kbase_uku.h
+index f3fcde4..c3f0654 100644
+--- a/driver/product/kernel/drivers/gpu/arm/midgard/mali_kbase_uku.h
++++ b/driver/product/kernel/drivers/gpu/arm/midgard/mali_kbase_uku.h
+@@ -302,6 +302,7 @@ struct kbase_uk_error_params {
+ };
+ #endif				/* SUPPORT_MALI_ERROR_INJECT */
+ 
++#if 0
+ #ifdef SUPPORT_MALI_NO_MALI
+ struct kbase_uk_model_control_params {
+ 	union uk_header header;
+@@ -309,6 +310,7 @@ struct kbase_uk_model_control_params {
+ 	struct kbase_model_control_params params;
+ };
+ #endif				/* SUPPORT_MALI_NO_MALI */
++#endif				/* SUPPORT_MALI_NO_MALI */
+ 
+ #ifdef BASE_LEGACY_UK8_SUPPORT
+ struct kbase_uk_keep_gpu_powered {
+diff --git a/driver/product/kernel/drivers/gpu/arm/midgard/mali_kbase_utility.h b/driver/product/kernel/drivers/gpu/arm/midgard/mali_kbase_utility.h
+index fd7252d..3f80a48 100644
+--- a/driver/product/kernel/drivers/gpu/arm/midgard/mali_kbase_utility.h
++++ b/driver/product/kernel/drivers/gpu/arm/midgard/mali_kbase_utility.h
+@@ -34,4 +34,15 @@
+  */
+ bool kbasep_list_member_of(const struct list_head *base, struct list_head *entry);
+ 
++static inline void kbase_timer_setup(struct timer_list *timer,
++                     void (*callback)(struct timer_list *timer))
++{
++#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 14, 0)
++    setup_timer(timer, (void (*)(unsigned long)) callback,
++            (unsigned long) timer);
++#else
++    timer_setup(timer, callback, 0);
++#endif
++}
++
+ #endif				/* _KBASE_UTILITY_H */
+diff --git a/driver/product/kernel/drivers/gpu/arm/midgard/platform/devicetree/mali_kbase_config_devicetree.c b/driver/product/kernel/drivers/gpu/arm/midgard/platform/devicetree/mali_kbase_config_devicetree.c
+index b2a7c93..c840c9a 100644
+--- a/driver/product/kernel/drivers/gpu/arm/midgard/platform/devicetree/mali_kbase_config_devicetree.c
++++ b/driver/product/kernel/drivers/gpu/arm/midgard/platform/devicetree/mali_kbase_config_devicetree.c
+@@ -1,31 +1,36 @@
++// SPDX-License-Identifier: GPL-2.0
+ /*
+  *
+- * (C) COPYRIGHT 2015 ARM Limited. All rights reserved.
++ * (C) COPYRIGHT 2015, 2017, 2020 ARM Limited. All rights reserved.
+  *
+  * This program is free software and is provided to you under the terms of the
+  * GNU General Public License version 2 as published by the Free Software
+  * Foundation, and any use by you of this program is subject to the terms
+- * of such GNU licence.
++ * of such GNU license.
+  *
+- * A copy of the licence is included with the program, and can also be obtained
+- * from Free Software Foundation, Inc., 51 Franklin Street, Fifth Floor,
+- * Boston, MA  02110-1301, USA.
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this program; if not, you can access it online at
++ * http://www.gnu.org/licenses/gpl-2.0.html.
+  *
+  */
+ 
+-
+-
+ #include <mali_kbase_config.h>
+ 
+-int kbase_platform_early_init(void)
+-{
+-	/* Nothing needed at this stage */
+-	return 0;
+-}
+-
+ static struct kbase_platform_config dummy_platform_config;
+ 
++#ifndef CONFIG_OF
++struct kbase_io_resources dummy_io_resources;
++#endif
++
+ struct kbase_platform_config *kbase_get_platform_config(void)
+ {
++#ifndef CONFIG_OF
++    dummy_platform_config.io_resources = &dummy_io_resources;
++#endif
+ 	return &dummy_platform_config;
+ }

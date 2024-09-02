@@ -1,0 +1,56 @@
+1. The kernels were built using Ubuntu 22.04 and gcc-11 (arm64) loosely following the commands:
+
+# apt-get install gcc-11-aarch64-linux-gnu
+# tar zxvf linux-5.10.155.tar.gz
+# cd linux-5.10.155
+# export CROSS_COMPILE=aarch64-linux-gnu-
+# export ARCH=arm64
+# make defconfig
+#   # edit the .config to update the CONFIG variables below
+# make oldconfig
+# make -j20
+#   # relevant output files are the vmlinux and the arch/arm64/boot/Image.gz
+
+
+2. The configs used are:
+CONFIG_DEBUG_INFO=y
+CONFIG_RANDOMIZE_BASE=n
+CONFIG_KASAN=y   # where kernels were built with kasan
+
+
+3. When building the Linux kernel for ARM64, CONFIG_OF is required which requires a device tree addition for a gpu devicetree (DT) node. To add a DT node, it is possible to dump the DT from qemu, update it, re-compile it, then use it at boot time.
+
+# dump the dtb for arm virt machine
+qemu-system-aarch64  -machine virt -machine dumpdtb=qemu.dtb
+
+# diassemble the dtb to dts
+linux-4.19.135/scripts/dtc/dtc -I dtb ./qemu.dtb > qemu.dts
+
+# modify the dts to add a mali gpu config (which will be overridden by the fake gpu model, just needs to be parsed by the driver during init)
+    gpu@c0000 {
+      compatible = "arm,mali-midgard";
+      reg = <0x0 0xc0000 0x0 0x400000>;
+      interrupts = <0x0 0x6 0x4>, <0x0 0x7 0x4>, <0x0 0x8 0x4>;
+      interrupt-names = "JOB", "MMU", "GPU";
+      clock-names = "apb_pclk";
+      clocks = <0x8000>;
+    };
+
+# recompile dtb from modified dts
+linux-4.19.135/scripts/dtc/dtc -I dts -O dtb -o qemu_mod.dtb qemu.dts
+
+# example command line to launch qemu to include qemu_mod.dtb
+qemu-system-aarch64 \
+    -S \
+    -gdb tcp::12345 \
+    -machine virt \
+    -cpu cortex-a57 \
+    -smp 2 \
+    -m 4096 \
+    -net nic -net user \
+    -nographic \
+    -kernel ${KERNEL}/arch/arm64/boot/Image.gz \
+    -append 'console=ttyAMA0 root=/dev/ram nokaslr debug earlyprintk' \
+    -initrd initramfs-arm64.cpio.gz \
+    -dtb qemu_mod.dtb
+

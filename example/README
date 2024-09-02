@@ -1,0 +1,64 @@
+# NOTE: command completed on Ubuntu 22.04.4 LTS x86_64 with qemu-system installed
+
+# retrieve the linux kernel source and driver source for version 29
+$ wget https://cdn.kernel.org/pub/linux/kernel/v4.x/linux-4.19.320.tar.xz >/dev/null 2>&1
+$ wget https://developer.arm.com/-/media/Files/downloads/mali-drivers/kernel/mali-bifrost-gpu/BX304L01B-SW-99002-r29p0-01eac0.tar > /dev/null 2>&1
+
+# unpack everything
+$ tar xf linux-4.19.320.tar.xz 
+$ tar xf BX304L01B-SW-99002-r29p0-01eac0.tar 
+
+# copy in the driver headers and sources
+$ cp -r driver/product/kernel/drivers/gpu/arm ./linux-4.19.320/drivers/gpu/
+$ cp driver/product/kernel/include/linux/* ./linux-4.19.320/include/linux/
+
+# insert the directory into the recursive Makefile scheme and hook into Kconfig
+$ sed -i "/^obj-y/ s/$/ arm\//" linux-4.19.320/drivers/gpu/Makefile
+$ sed -i '/.*drm\/Kconfig"/a source "drivers\/gpu\/arm\/Kconfig"' linux-4.19.320/drivers/video/Kconfig
+
+# add configs to defconfig for x86_64
+$ cat <<- EOF >> ./linux-4.19.320/arch/x86/configs/x86_64_defconfig
+CONFIG_MALI_MIDGARD=y
+CONFIG_MALI_NO_MALI=y
+CONFIG_MALI_DDK_VERSION=y
+CONFIG_MALI_PLATFORM_NAME="devicetree"
+CONFIG_MALI_EXPERT=y
+CONFIG_MALI_DEBUG=y
+CONFIG_MALI_FENCE_DEBUG=y
+CONFIG_MALI_PRFCNT_SET_PRIMARY=y
+CONFIG_MALI_GATOR_SUPPORT=n
+CONFIG_MALI_MIDGARD_ENABLE_TRACE=n
+CONFIG_MALI_SYSTEM_TRACE=n
+CONFIG_MALI_KUTF=n
+CONFIG_MALI_IRQ_LATENCY=n
+CONFIG_CONFIG_MALI_CLK_RATE_TRACE_PORTAL=n
+EOF
+
+# copy in the simple model headers and source files
+$ cp ./mali_kbase_model_linu.h linux-4.19.320/drivers/gpu/arm/midgard/
+$ cp ./mali_kbase_model_dummy.h linux-4.19.320/drivers/gpu/arm/midgard/backend/gpu/
+$ cp ./mali_kbase_model_dummy.c linux-4.19.320/drivers/gpu/arm/midgard/backend/gpu/
+$ cp ./mali_kbase_config_devicetree.c linux-4.19.320/drivers/gpu/arm/midgard/platform/devicetree/
+
+# fix up the build env
+$ sed -i '/mali_kbase_model_linux.c/ s/BACKEND/#BACKEND/' linux-4.19.320/drivers/gpu/arm/midgard/backend/gpu/Kbuild
+$ sed -i '/mali_kbase_model_error_generator.c/ s/BACKEND/#BACKEND/' linux-4.19.320/drivers/gpu/arm/midgard/backend/gpu/Kbuild
+$ sed -i 's/^SRC := /SRC := mali_kbase_platform_fake.c /' linux-4.19.320/drivers/gpu/arm/midgard/Kbuild
+
+# fix up the power management function to ret 0 always
+$ sed -i 's/return -EINVAL;/return 0;/' linux-4.19.320/drivers/gpu/arm/midgard/backend/gpu/mali_kbase_pm_driver.c
+
+# build the kernel with driver in-tree
+$ cd linux-4.19.320
+$ make defconfig
+$ make -j20
+$ cd -
+
+$ tar zxvf initramfs.tar.gz
+$ ./run.sh
+
+# start gdb session in a new terminal
+$ cd linux-4.19.320
+$ gdb vmlinux
+(gdb) target remote :12345
+(gdb) c

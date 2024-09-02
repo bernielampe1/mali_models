@@ -1,0 +1,24 @@
+#!/bin/sh
+
+/bin/mount -t proc none /proc
+/bin/mount -t sysfs none /sys
+/bin/mount -t debugfs none /sys/kernel/debug
+/bin/mount -t cgroup none /cgroup
+
+/bin/mkdir /tmp
+/bin/mount -t tmpfs none /tmp
+
+# create all devices
+/sbin/mdev -s
+
+# config networking because we have no dhcp client
+ifconfig eth0 10.0.2.15 netmask 255.255.255.0 up
+
+# bring up lo
+ifconfig lo 127.0.0.1 netmask 255.255.255.0 up
+
+# hack to allow job control
+setsid cttyhack sh
+
+# start shell
+exec /bin/sh

@@ -21,15 +21,13 @@ This project is a set of working mali device driver testing environments using q
     * ASAN
 
 # Install Prereqs:
-
 These are targets for Ubuntu 22.04.4 LTS.
 
 ```console
 # sudo apt-get install build-dep linux libncurses-dev gawk flex bison openssl libssl-dev dkms libelf-dev libudev-dev libpci-dev libiberty-dev autoconf llvm git qemu-system-arm gdb-multiarch
 ```
 
-# Demonstration usage:
-
+# Booting up:
 ```console
 $ ./run.sh
 [    0.000000] Booting Linux on physical CPU 0x0000000000 [0x411fd070]
@@ -48,11 +46,13 @@ $ ./run.sh
 [    1.092655] uart-pl011 9000000.pl011: no DMA platform data
 [    1.109920] Freeing unused kernel memory: 1216K
 [    1.111929] Run /init as init process
-```
-
-```console
 / # uname -a
 Linux (none) 4.19.135 #1 SMP PREEMPT Thu Jul 11 16:12:20 EDT 2024 aarch64 GNU/Linux
+/ #
+```
+
+# Loading a the mali GPU module:
+```console
 / # mount /mnt
 /mnt # cd /mnt
 /mnt # ./load_mod.sh mali_kbase_jm_r40p0.ko
@@ -73,7 +73,6 @@ crw-rw-r--    1 0        0          10,  58 Sep  2 18:50 /dev/mali0
 ```
 
 # Debugging:
-
 ```console
 $ cd modules/linux-4.19.135_arm64
 $ unxz mali_kbase_jm_r40p0.ko.xz 

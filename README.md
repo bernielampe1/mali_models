@@ -52,7 +52,7 @@ Linux (none) 4.19.135 #1 SMP PREEMPT Thu Jul 11 16:12:20 EDT 2024 aarch64 GNU/Li
 / #
 ```
 
-# Loading a the mali GPU module:
+# Loading the mali GPU module:
 ```console
 / # mount /mnt
 /mnt # cd /mnt
